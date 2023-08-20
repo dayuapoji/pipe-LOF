@@ -1,62 +1,69 @@
-# DATA PREPARATION #################################################
+# ==============================================================================
+# PREPARE FAILURE DATA
+# ==============================================================================
 
-# Failure DF ======================================================
 df_fail_2023 <- orig_fail_2023 %>% 
-  .[c(colnames(.)[c(2, 4, 5, 7, 8, 11, 13, 14, 15, 16, 17, 21)])] %>%
+  .[c(colnames(.)[c(2, 4, 5, 7, 8, 11, 13, 14, 15, 17, 21)])] %>%
   set_names(c('ReportNum', # to avoid duplication
-              'DateFailure', 'YearFailure',
+              'DateFail', 'YearFail',
               'CoordE', 'CoordN', 'City',
-              'PipeExt', 'PipeDia', 'PipeMat', 'YearInstall',
-              'FailurePart', 'FailureType')) %>%
+              'PipeExt', 'PipeDia', 'PipeMat', #'YearInstall',
+              'FailPart', 'FailType')) %>%
   # remove rows with all "NA" values
   filter(rowSums(!is.na(.)) > 0) %>%
+  # TO CHECK!
   mutate(PipeEMD = paste0(PipeExt, "$", PipeMat, "$", PipeDia )) %>%
   # remove 2023 records
-  filter(YearFailure < 2023) # 2023 data haven't been received
+  filter(YearFail < 2023) # 2023 data haven't been received
 
 df_fail_2022 <- orig_fail_2022 %>% 
-  .[c(colnames(.)[c(2, 4, 5, 7, 8, 11, 13, 14, 15, 16, 17, 21)])] %>%
+  .[c(colnames(.)[c(2, 4, 5, 7, 8, 11, 13, 14, 15, 17, 21)])] %>%
   set_names(c('ReportNum',
-              'DateFailure', 'YearFailure',
+              'DateFail', 'YearFail',
               'CoordE', 'CoordN', 'City',
-              'PipeExt', 'PipeDia', 'PipeMat', 'YearInstall',
-              'FailurePart', 'FailureType')) %>%
+              'PipeExt', 'PipeDia', 'PipeMat', #'YearInstall',
+              'FailPart', 'FailType')) %>%
   # remove rows with all "NA" values
   filter(rowSums(!is.na(.)) > 0) %>%
   mutate(PipeEMD = paste0(PipeExt, "$", PipeMat, "$", PipeDia ))
 
 df_fail_2021 <- orig_fail_2021 %>% 
-  .[c(colnames(.)[c(2, 3, 4, 6, 7, 10, 12, 13, 14, 15, 16, 20)])] %>%
+  .[c(colnames(.)[c(2, 3, 4, 6, 7, 10, 12, 13, 14,  16, 20)])] %>%
   set_names(c('ReportNum', 
-              'DateFailure', 'YearFailure',
+              'DateFail', 'YearFail',
               'CoordE', 'CoordN', 'City',
-              'PipeExt', 'PipeDia', 'PipeMat', 'YearInstall',
-              'FailurePart', 'FailureType')) %>%
+              'PipeExt', 'PipeDia', 'PipeMat', #'YearInstall',
+              'FailPart', 'FailType')) %>%
   # remove rows with all "NA" values
   filter(rowSums(!is.na(.)) > 0) %>%
   mutate(PipeEMD = paste0(PipeExt, "$", PipeMat, "$", PipeDia ))
 
-
+# bind df
 df_fail <- rbind(df_fail_2023,
                  df_fail_2022, 
                  df_fail_2021) %>%
   # keep only one instance of duplicated rows
-  distinct() #%>%
-# filter(., PipeMat %in% c('S')) %>%
-# filter(., PipeDia == 8) %>%
-# filter(., YearFailure == 2022)
-
+  distinct(ReportNum, .keep_all = T) %>%
+  # change date format
+  mutate(DateFail = ymd(DateFail)) %>%
+  # exclude pipes with some charasteristics
+  filter(., PipeMat %in% c('A', 'C', 'S')) %>%
+  filter(PipeDia <= 16)
+  
 # Plot
 ggplot(df_fail %>%
-         group_by(YearFailure) %>%
-         summarise(FailureCount = n()),
-       aes(x = YearFailure, y = FailureCount)) +
+         group_by(YearFail) %>%
+         summarise(FailCount = n()),
+       aes(x = YearFail, y = FailCount)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   xlab("Year") +
-  ylab("Failure Count") +
+  ylab("Fail Count") +
   theme_bw()
 
-# Pipe DF ========================================================
+# ==============================================================================
+# PREPARE PIPE DATA
+# ==============================================================================
+
 df_pipe_2022 <- orig_pipe_2022 %>% 
   .[c(colnames(.)[c(2, 3, 4, 5, 9, 10, 13, 17)])] %>%
   set_names(c('PipeMat', 'PipeExt', 'PipeDia', 'PipeEMD', 'YearInstall',
@@ -65,28 +72,38 @@ df_pipe_2022 <- orig_pipe_2022 %>%
   filter(rowSums(!is.na(.)) > 0)
 
 df_pipe <- df_pipe_2022 %>%
+  # get pipe length for every PipeEMD
   group_by(PipeEMD) %>%
+  # TO CHECK!
   summarise(PipeLengthEMD = sum(PipeLengthRMID, na.rm = TRUE) / 5280, # in mile
             PipeMat = first(PipeMat),
             PipeDia = first(PipeDia),
             YearInstall = first(YearInstall)) %>%
   ungroup() %>% 
-  mutate(YearInstall = as.numeric(as.character(YearInstall))) %>%
-  mutate(YearInstall = ifelse(YearInstall < 1000, # should we remove?
-                              1900 + YearInstall, 
-                              YearInstall)) 
-# NOTE: need to exclude pipes with some charasteristics
-
+  # clean year install
+  filter(YearInstall > 0) %>%
+  # change date format
+  # mutate(YearInstall = as.numeric(as.character(YearInstall))) %>%
+  mutate(YearInstall = ymd(paste0(YearInstall, "-01-01"))) %>%
+  # exclude pipes with some charasteristics
+  filter(., PipeMat %in% c('A', 'C', 'S')) %>%
+  filter(PipeDia <= 16)
+  
+  
 # Plot
-ggplot(df_pipe %>% filter(., PipeMat %in% c('A', 'C', 'S')), 
+# fig_pipe <- 
+ggplot(df_pipe, 
        aes(x = as.factor(YearInstall), y = PipeLengthEMD, 
-          fill = PipeMat)) +
+           fill = PipeMat)) +
   geom_col() +
   xlab("Year Install") +
-  scale_x_discrete(breaks = pretty(df_pipe$YearInstall, n = 20)) +
+  scale_x_discrete(breaks = pretty(df_pipe$YearInstall, n = 10)) +
   ylab("Total Pipe Length (Miles)") +
-  theme_bw()
+  theme_bw() #+
+  # theme(legend.position = 'none')
 
+
+# fig_dia <- 
 ggplot(df_pipe, 
        aes(x = as.factor(PipeDia), y = PipeLengthEMD, 
            fill = PipeMat)) +
@@ -95,51 +112,40 @@ ggplot(df_pipe,
   ylab("Total Pipe Length (Miles)") +
   theme_bw()
 
-ggplot(df_pipe, 
-       aes(x = as.factor(PipeMat), y = PipeLengthEMD, 
-           fill = as.factor(PipeDia))) +
-  geom_col() +
-  xlab("Pipe Material") +
-  ylab("Total Pipe Length (Miles)") +
-  theme_bw()
+# ggsave("../output/fig_pipe.pdf", plot_grid(fig_pipe, fig_dia, ncol = 2),
+#        width = 9, height = 6)
 
-# Length DF ======================================================
+# ==============================================================================
+# CHECK DATA
+# ==============================================================================
 
-# sort failure years
-failure_years <- sort(unique(df_fail$YearFailure))
+# number of unique pipe ID in pipe df
+length(unique(df_pipe$PipeEMD))
 
-# Create a list of data frames with Year column filled for each year
-df_list <- lapply(failure_years, function(year) {
-  df <- df_pipe
-  df$Year <- year
-  return(df)
-})
+# number of unique pipe ID in fail df
+length(unique(df_fail$PipeEMD))
 
-# Combine the data frames in the list using rbind
-df_list <- do.call(rbind, df_list)
+# PipeEMD in df_pipe that are not in df_fail (no failure record)
+length(setdiff(df_pipe$PipeEMD, df_fail$PipeEMD))
 
-# Create df length, consists of pipe length of every pipe mat and
-# pipe age in every year
-df_length <- df_list %>%
-  # filter (Year >= 2015) %>%
-  mutate(PipeAge = Year - YearInstall) %>%
-  filter(PipeAge > 0) %>%
-  # at that particular year, sum the length of all pipes with 
-  # same age and same material type
-  group_by(Year, PipeAge, PipeMat) %>%
-  summarize(PipeLength = round(sum(PipeLengthEMD), 2), 
-            .groups = 'drop') #%>%
-# group_by(Year, PipeMat) %>%
-# arrange(PipeAge) %>%
-# mutate(CumPipeLength = round(cumsum(PipeLength), 2))
+# PipeEMD in df_fail that are not in df_pipe: problem?
+missing_pipes <- data.frame(PipeEMD = setdiff(df_fail$PipeEMD, df_pipe$PipeEMD))
+missing_pipes_failures <- df_fail %>% filter(PipeEMD %in% c(setdiff(df_fail$PipeEMD, df_pipe$PipeEMD)))
 
-ggplot(df_length %>% 
-         filter(., PipeMat %in% c('A', 'C', 'S')) %>%
-         filter(., Year %in% c(1990, 2000, 2010, 2020)),
-       aes(x = PipeAge, y = PipeLength,
-           fill = PipeMat)) +
-  geom_col() +
-  theme_bw() +
-  facet_wrap(~ Year, nrow = 2, ncol = 2)
-  
+# write_csv(missing_pipes, "../output/missing_pipes.csv")
+# write_csv(missing_pipes_failures, "../output/missing_pipes_failures.csv")
 
+
+# check inconsistent year installation
+# check_YearInstall <- merge(df_fail, df_pipe, 
+#                            by = "PipeEMD", 
+#                            suffixes = c("_fail", "_pipe")) %>%
+#   filter(YearInstall_fail != YearInstall_pipe) %>%
+#   select(PipeEMD, YearInstall_fail, YearInstall_pipe) 
+# 
+# nrow(check_YearInstall)
+# 
+# check_YearInstall <- check_YearInstall %>%
+#   filter(YearInstall_fail > 1000)
+# 
+# nrow(check_YearInstall)
