@@ -2,13 +2,11 @@
 # LOAD DATA
 # ==============================================================================
 
-# Failure data
-orig_fail_2023 <- read_csv('../data/PRP_Leak_2023.csv')
-orig_fail_2022 <- read_csv('../data/PRP_Leak_2022.csv')
-orig_fail_2021 <- read_csv('../data/PRP_Leak.csv')
-
 # Pipe data
-orig_pipe_2022 <- read_csv('../data/PRP_Pipe_2022.csv')
+orig_pipe <- read_csv('../data/PRP_Pipe_2020RMIDs.csv')
+
+# Failure data
+orig_fail <- read_csv('../data/PRP_Leak_2020RMIDs.csv')
 
 # Predictors
 # orig_cova <- read_csv('../data/cova.csv')
